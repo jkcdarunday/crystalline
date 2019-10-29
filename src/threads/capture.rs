@@ -31,7 +31,10 @@ pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_t
 
             match process_packet(packet) {
                 Err(error) => println!("Error: {}", error),
-                Ok((connection, bytes_transferred)) => update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred)
+                Ok((connection, bytes_transferred)) => {
+                    update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred);
+                    sender.send(connections.clone()).unwrap();
+                }
             };
         }
     });
@@ -112,7 +115,7 @@ fn update_connections_with_bytes_transferred(connections: &mut HashMap<Connectio
         let mut connection_status = connections.get_mut(&connection).unwrap();
         connection_status.bytes_transferred += bytes_transferred;
     } else {
-        if (connection.transport_type == TransportType::Tcp) {
+        if connection.transport_type == TransportType::Tcp {
             connections.insert(
                 connection,
                 ConnectionStatus { inode: 0, bytes_transferred: bytes_transferred },
@@ -124,9 +127,5 @@ fn update_connections_with_bytes_transferred(connections: &mut HashMap<Connectio
 //            }
 //        }
 //        println!("Received packet from unknown connection: {:?}", connection);
-    }
-    print!("{}[2J", 27 as char);
-    for (connection, connection_status) in connections {
-        println!("{} | {} bytes", connection, connection_status.bytes_transferred);
     }
 }
