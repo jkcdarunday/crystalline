@@ -41,7 +41,10 @@ pub fn get_inodes_per_process() -> HashMap<usize, Vec<u64>> {
         let mut inodes = Vec::new();
         for process_fd_path in process_fd_paths {
             let fd = process_fd_path.unwrap();
-            let inode = fd.metadata().unwrap().ino();
+            let inode = match fd.metadata() {
+                Ok(metadata) => metadata.ino(),
+                Err(_) => continue
+            };
 
             inodes.push(inode);
         }
