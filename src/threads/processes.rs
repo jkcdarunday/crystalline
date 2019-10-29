@@ -33,7 +33,10 @@ pub fn get_inodes_per_process() -> HashMap<usize, Vec<u64>> {
             Err(_) => continue
         };
 
-        let process_fd_paths = fs::read_dir(format!("/proc/{}/fd", process_id)).unwrap();
+        let process_fd_paths = match fs::read_dir(format!("/proc/{}/fd", process_id)) {
+            Ok(process_fd) => process_fd,
+            Err(_) => continue
+        };
 
         let mut inodes = Vec::new();
         for process_fd_path in process_fd_paths {
