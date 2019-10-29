@@ -1,33 +1,48 @@
-use std::thread;
-use std::time::Duration;
 use std::collections::HashMap;
+use std::sync::Mutex;
+use crate::structs::connection::{ConnectionStatus, Connection};
+use actix_web::{web, App, HttpResponse, HttpRequest, HttpServer, middleware};
+use std::sync::mpsc::Receiver;
+use serde_json::json;
 
 mod structs;
 mod threads;
+
+fn index(state: web::Data<Mutex<(Receiver<HashMap<Connection, ConnectionStatus>>, HashMap<Connection, ConnectionStatus>)>>, req: HttpRequest) -> HttpResponse {
+    println!("{:?}", req);
+    let mut locked_state = state.lock().unwrap();
+
+    let mut latest_connections = locked_state.0.try_recv();
+    while latest_connections.is_ok() {
+        locked_state.1 = latest_connections.unwrap();
+        latest_connections = locked_state.0.try_recv()
+    }
+
+    let mut retval = vec![];
+
+    for (connection, status)  in &locked_state.1 {
+        retval.push(json!({"connection": connection, "status": status}));
+    };
+
+    HttpResponse::Ok().json(retval)
+}
 
 fn main() {
     let (_, connections_thread) = threads::connections::run(1000);
     let (_, processes_thread) = threads::processes::run(1000);
     let (_, capture_thread) = threads::capture::run(connections_thread, processes_thread);
 
-    let mut connections= HashMap::new();
-    loop {
-        print!("Updating connections... ");
-        let mut latest_connections = capture_thread.try_recv();
-        while latest_connections.is_ok() {
-            connections = latest_connections.unwrap();
-            latest_connections = capture_thread.try_recv()
-        }
 
-        println!("OK");
+    let state = web::Data::new(Mutex::new((capture_thread, HashMap::<Connection, ConnectionStatus>::new())));
 
-        if connections.len() > 0 {
-            print!("{}[2J", 27 as char);
-            for (connection, connection_status) in &connections {
-                println!("{} | {} bytes", connection, connection_status.bytes_transferred);
-            }
-        }
-
-        thread::sleep(Duration::from_millis(1000));
-    }
+    HttpServer::new(move || {
+        App::new()
+            .register_data(state.clone())
+            .wrap(middleware::Logger::default())
+            .service(web::resource("/").to(index))
+    })
+        .bind("127.0.0.1:8080")
+        .unwrap()
+        .run()
+        .unwrap();
 }
