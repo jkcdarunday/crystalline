@@ -10,10 +10,7 @@ pub fn run(interval: u64) -> (JoinHandle<()>, Receiver<HashMap<usize, Vec<u64>>>
 
     let handle = thread::spawn(move || {
         loop {
-            match get_inodes_per_process() {
-                Ok(inodes) => sender.send(inodes).unwrap(),
-                Err(_) => {}
-            }
+            sender.send(get_inodes_per_process()).unwrap();
             thread::sleep(Duration::from_millis(interval));
         }
     });
@@ -22,7 +19,7 @@ pub fn run(interval: u64) -> (JoinHandle<()>, Receiver<HashMap<usize, Vec<u64>>>
 }
 
 
-pub fn get_inodes_per_process() -> Result<HashMap<usize, Vec<u64>>, std::io::Error> {
+pub fn get_inodes_per_process() -> HashMap<usize, Vec<u64>> {
     let mut process_inodes  = HashMap::new();
     let proc_dirs = fs::read_dir("/proc").unwrap();
 
@@ -36,7 +33,7 @@ pub fn get_inodes_per_process() -> Result<HashMap<usize, Vec<u64>>, std::io::Err
             Err(_) => continue
         };
 
-        let process_fd_paths = fs::read_dir(format!("/proc/{}/fd", process_id))?;
+        let process_fd_paths = fs::read_dir(format!("/proc/{}/fd", process_id)).unwrap();
 
         let mut inodes = Vec::new();
         for process_fd_path in process_fd_paths {
@@ -49,5 +46,5 @@ pub fn get_inodes_per_process() -> Result<HashMap<usize, Vec<u64>>, std::io::Err
         process_inodes.insert(process_id, inodes);
     }
 
-    Ok(process_inodes)
+    process_inodes
 }

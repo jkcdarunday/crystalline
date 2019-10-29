@@ -14,7 +14,7 @@ pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_t
     let (sender, receiver) = channel();
 
     let handle = thread::spawn(move || {
-        let _process_inodes = processes_thread.recv().unwrap_or(threads::processes::get_inodes_per_process().unwrap());
+        let _process_inodes = processes_thread.recv().unwrap_or(threads::processes::get_inodes_per_process());
         let mut connections = HashMap::<Connection, ConnectionStatus>::new();
 
         let devices = Device::list().unwrap();
