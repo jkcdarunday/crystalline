@@ -30,7 +30,7 @@ pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_t
             update_connections_with_inodes_from_receiver(&mut connections, &connections_thread);
 
             match process_packet(packet) {
-                Err(error) => println!("Error: {}", error),
+                Err(_error) => {}, //println!("Error: {}", error),
                 Ok((connection, bytes_transferred)) => {
                     update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred);
                     sender.send(connections.clone()).unwrap();
