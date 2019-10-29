@@ -10,11 +10,11 @@ use crate::threads;
 use std::thread::JoinHandle;
 use std::thread;
 
-pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, _processes_thread: Receiver<HashMap<usize, Vec<u64>>>) -> (JoinHandle<()>, Receiver<HashMap<Connection, ConnectionStatus>>) {
+pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_thread: Receiver<HashMap<usize, Vec<u64>>>) -> (JoinHandle<()>, Receiver<HashMap<Connection, ConnectionStatus>>) {
     let (sender, receiver) = channel();
 
     let handle = thread::spawn(move || {
-        let _process_inodes = threads::processes::get_inodes_per_process();
+        let _process_inodes = processes_thread.recv().unwrap_or(threads::processes::get_inodes_per_process());
         let mut connections = HashMap::<Connection, ConnectionStatus>::new();
 
         let devices = Device::list().unwrap();
