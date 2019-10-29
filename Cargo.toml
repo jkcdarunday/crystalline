@@ -1,0 +1,12 @@
+[package]
+name = "glasswire"
+version = "0.1.0"
+authors = ["Jan Keith Darunday <jkcdarunday@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+pcap = "0.7.0"
+etherparse = "0.8.2"
+scan_fmt = "0.2.2"
+hex = "0.3.2"
+custom_error = "1.6.0"
