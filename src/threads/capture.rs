@@ -1,17 +1,21 @@
-use pcap::{Device, Packet};
-use etherparse::SlicedPacket;
+use std::collections::HashMap;
+use std::sync::mpsc::Receiver;
+use std::thread;
+use std::thread::JoinHandle;
+
 use etherparse::InternetSlice::Ipv4;
 use etherparse::InternetSlice::Ipv6;
+use etherparse::SlicedPacket;
 use etherparse::TransportSlice::{Tcp, Udp};
-use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, channel};
+use pcap::{Device, Packet};
+use single_value_channel;
+
 use crate::structs::connection::{Connection, ConnectionStatus, TransportType};
 use crate::threads;
-use std::thread::JoinHandle;
-use std::thread;
 
-pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_thread: Receiver<HashMap<usize, Vec<u64>>>) -> (JoinHandle<()>, Receiver<HashMap<Connection, ConnectionStatus>>) {
-    let (sender, receiver) = channel();
+pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_thread: Receiver<HashMap<usize, Vec<u64>>>) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<Connection, ConnectionStatus>>>) {
+//    let (sender, receiver) = channel();
+    let (receiver, updater) = single_value_channel::channel();
 
     let handle = thread::spawn(move || {
         let _process_inodes = processes_thread.recv().unwrap_or(threads::processes::get_inodes_per_process());
@@ -30,10 +34,10 @@ pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_t
             update_connections_with_inodes_from_receiver(&mut connections, &connections_thread);
 
             match process_packet(packet) {
-                Err(_error) => {}, //println!("Error: {}", error),
+                Err(_error) => {} //println!("Error: {}", error),
                 Ok((connection, bytes_transferred)) => {
                     update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred);
-                    sender.send(connections.clone()).unwrap();
+                    updater.update(Some(connections.clone())).unwrap();
                 }
             };
         }
