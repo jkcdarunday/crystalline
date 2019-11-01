@@ -5,12 +5,13 @@ use actix_cors::Cors;
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, middleware, web};
 use serde_json::json;
 
-use crate::structs::connection::{Connection, ConnectionStatus};
+use crate::structs::connection::{Connection, ConnectionStatus, ConnectionWithStatus};
+use crate::structs::receivers::CaptureReceiver;
 
 mod structs;
 mod threads;
 
-fn index(state: web::Data<Mutex<(single_value_channel::Receiver<Option<HashMap<Connection, ConnectionStatus>>>, HashMap<Connection, ConnectionStatus>)>>, req: HttpRequest) -> HttpResponse {
+fn index(state: web::Data<Mutex<(CaptureReceiver, ConnectionWithStatus)>>, req: HttpRequest) -> HttpResponse {
     println!("{:?}", req);
     let mut locked_state = state.lock().unwrap();
 

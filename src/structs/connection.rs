@@ -1,7 +1,9 @@
-use std::fmt::{Display, Formatter, Error};
-use serde_derive::{Serialize};
-use serde::ser::SerializeStruct;
+use std::collections::HashMap;
+use std::fmt::{Display, Error, Formatter};
+
 use serde::ser;
+use serde::ser::SerializeStruct;
+use serde_derive::Serialize;
 
 #[derive(Hash, Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum TransportType {
@@ -23,6 +25,8 @@ pub struct ConnectionStatus {
     pub inode: usize,
     pub bytes_transferred: usize,
 }
+
+pub type ConnectionWithStatus = HashMap<Connection, ConnectionStatus>;
 
 fn ip_to_string(ip: &Vec<u8>) -> String {
     let ip_string_array: Vec<String> = ip.iter().map(|num| num.to_string()).collect();

@@ -10,12 +10,11 @@ use etherparse::TransportSlice::{Tcp, Udp};
 use pcap::{Device, Packet};
 use single_value_channel;
 
-use crate::structs::connection::{Connection, ConnectionStatus, TransportType};
+use crate::structs::connection::{Connection, ConnectionStatus, ConnectionWithStatus, TransportType};
+use crate::structs::receivers::{CaptureReceiver, ConnectionsReceiver, ProcessesReceiver};
 use crate::threads;
 
-
-
-pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, mut processes_thread: single_value_channel::Receiver<Option<HashMap<usize, Vec<u64>>>>) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<Connection, ConnectionStatus>>>) {
+pub fn run(connections_thread: ConnectionsReceiver, mut processes_thread: ProcessesReceiver) -> (JoinHandle<()>, CaptureReceiver) {
 //    let (sender, receiver) = channel();
     let (receiver, updater) = single_value_channel::channel();
 
@@ -96,7 +95,7 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
     Ok((connection, packet_size))
 }
 
-fn update_connections_with_inodes_from_receiver(connections: &mut HashMap<Connection, ConnectionStatus>, receiver: &Receiver<HashMap<Connection, usize>>) {
+fn update_connections_with_inodes_from_receiver(connections: &mut ConnectionWithStatus, receiver: &Receiver<HashMap<Connection, usize>>) {
     loop {
         match receiver.try_recv() {
             Ok(new_connections) => update_connections_with_inodes(connections, new_connections),
@@ -105,7 +104,7 @@ fn update_connections_with_inodes_from_receiver(connections: &mut HashMap<Connec
     }
 }
 
-fn update_connections_with_inodes(connections: &mut HashMap<Connection, ConnectionStatus>, connection_inodes: HashMap<Connection, usize>) {
+fn update_connections_with_inodes(connections: &mut ConnectionWithStatus, connection_inodes: HashMap<Connection, usize>) {
     for (connection, inode) in connection_inodes {
         if connections.contains_key(&connection) {
             let mut connection_status = connections.get_mut(&connection).unwrap();
@@ -119,7 +118,7 @@ fn update_connections_with_inodes(connections: &mut HashMap<Connection, Connecti
     }
 }
 
-fn update_connections_with_bytes_transferred(connections: &mut HashMap<Connection, ConnectionStatus>, connection: Connection, bytes_transferred: usize) {
+fn update_connections_with_bytes_transferred(connections: &mut ConnectionWithStatus, connection: Connection, bytes_transferred: usize) {
     if connections.contains_key(&connection) {
         let mut connection_status = connections.get_mut(&connection).unwrap();
         connection_status.bytes_transferred += bytes_transferred;
