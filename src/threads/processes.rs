@@ -4,7 +4,10 @@ use std::os::unix::fs::MetadataExt;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-pub fn run(interval: u64) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<usize, Vec<u64>>>>) {
+use libc::pid_t;
+use procfs::process::FDTarget::{Net, Other, Pipe, Socket};
+
+pub fn run(interval: u64) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<pid_t, Vec<u32>>>>) {
     let (receiver, updater) = single_value_channel::channel();
 
     let handle = thread::spawn(move || {
@@ -18,37 +21,19 @@ pub fn run(interval: u64) -> (JoinHandle<()>, single_value_channel::Receiver<Opt
 }
 
 
-pub fn get_inodes_per_process() -> HashMap<usize, Vec<u64>> {
-    let mut process_inodes  = HashMap::new();
-    let proc_dirs = fs::read_dir("/proc").unwrap();
+pub fn get_inodes_per_process() -> HashMap<pid_t, Vec<u32>> {
+    let mut process_inodes = HashMap::new();
 
-    for proc_dir_result in proc_dirs {
-        let proc_dir = proc_dir_result.unwrap();
-        let proc_dir_filename= proc_dir.file_name().into_string().unwrap();
-
-        // Check if filename is parseable as number
-        let process_id = match proc_dir_filename.parse::<usize>() {
-            Ok(process_id) => process_id,
-            Err(_) => continue
-        };
-
-        let process_fd_paths = match fs::read_dir(format!("/proc/{}/fd", process_id)) {
-            Ok(process_fd) => process_fd,
-            Err(_) => continue
-        };
-
+    for process in procfs::process::all_processes().unwrap() {
         let mut inodes = Vec::new();
-        for process_fd_path in process_fd_paths {
-            let fd = process_fd_path.unwrap();
-            let inode = match fd.metadata() {
-                Ok(metadata) => metadata.ino(),
-                Err(_) => continue
-            };
-
-            inodes.push(inode);
+        for file_descriptor in process.fd().unwrap() {
+            match file_descriptor.target {
+                Socket(inode) | Net(inode) | Pipe(inode) | Other(_, inode) => inodes.push(inode),
+                _ => {}
+            }
         }
 
-        process_inodes.insert(process_id, inodes);
+        process_inodes.insert(process.pid(), inodes);
     }
 
     process_inodes
