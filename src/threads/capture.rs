@@ -13,12 +13,17 @@ use single_value_channel;
 use crate::structs::connection::{Connection, ConnectionStatus, TransportType};
 use crate::threads;
 
-pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, processes_thread: Receiver<HashMap<usize, Vec<u64>>>) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<Connection, ConnectionStatus>>>) {
+
+
+pub fn run(connections_thread: Receiver<HashMap<Connection, usize>>, mut processes_thread: single_value_channel::Receiver<Option<HashMap<usize, Vec<u64>>>>) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<Connection, ConnectionStatus>>>) {
 //    let (sender, receiver) = channel();
     let (receiver, updater) = single_value_channel::channel();
 
     let handle = thread::spawn(move || {
-        let _process_inodes = processes_thread.recv().unwrap_or(threads::processes::get_inodes_per_process());
+        let _process_inodes = match processes_thread.latest() {
+            Some(inodes) => inodes.clone(),
+            None => threads::processes::get_inodes_per_process()
+        };
         let mut connections = HashMap::<Connection, ConnectionStatus>::new();
 
         let devices = Device::list().unwrap();

@@ -1,16 +1,15 @@
-use std::collections::HashMap;
 use std::{fs, thread};
+use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
-use std::sync::mpsc::{Receiver, channel};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-pub fn run(interval: u64) -> (JoinHandle<()>, Receiver<HashMap<usize, Vec<u64>>>) {
-    let (sender, receiver) = channel();
+pub fn run(interval: u64) -> (JoinHandle<()>, single_value_channel::Receiver<Option<HashMap<usize, Vec<u64>>>>) {
+    let (receiver, updater) = single_value_channel::channel();
 
     let handle = thread::spawn(move || {
         loop {
-            sender.send(get_inodes_per_process()).unwrap();
+            updater.update(Some(get_inodes_per_process())).unwrap();
             thread::sleep(Duration::from_millis(interval));
         }
     });
