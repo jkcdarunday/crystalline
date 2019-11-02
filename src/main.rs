@@ -6,23 +6,23 @@ use serde_json::json;
 
 use crate::structs::connection::Connections;
 use crate::structs::receivers::{CaptureReceiver, ProcessesReceiver};
+use crate::structs::process::ProcessInfos;
 
 mod structs;
 mod threads;
 
-fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections)>>, _req: HttpRequest) -> HttpResponse {
+fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections, ProcessInfos)>>, _req: HttpRequest) -> HttpResponse {
     let mut locked_state = state.lock().unwrap();
 
-    let (ref mut receiver, ref mut processes_receiver, ref mut connections) = *locked_state;
+    let (ref mut receiver, ref mut processes_receiver, ref mut connections, ref mut processes) = *locked_state;
 
     if let Some(latest_connections) = receiver.latest() {
         *connections = latest_connections.clone()
     }
 
-    let processes = match processes_receiver.latest() {
-        Some(latest_processes) => latest_processes.clone(),
-        None => vec![]
-    };
+    if let Some(latest_processes) = processes_receiver.latest() {
+        processes.append(&mut latest_processes.clone());
+    }
 
     HttpResponse::Ok().json(json!({"connections": connections, "processes": processes}))
 }
@@ -33,7 +33,7 @@ fn main() -> std::io::Result<()> {
     let (_, capture_thread) = threads::capture::run(connections_thread);
 
 
-    let state = web::Data::new(Mutex::new((capture_thread, processes_thread, Connections::new())));
+    let state = web::Data::new(Mutex::new((capture_thread, processes_thread, Connections::new(), ProcessInfos::new())));
 
     HttpServer::new(move || App::new()
         .register_data(state.clone())

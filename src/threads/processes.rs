@@ -23,7 +23,7 @@ pub fn get_inodes_per_process() -> ProcessInfos {
     for process in procfs::process::all_processes().unwrap() {
         let mut process_info = ProcessInfo {
             pid: process.pid(),
-            command: process.cmdline().unwrap().join(" "),
+            command: process.cmdline().unwrap_or_default().join(" "),
             executable: String::from(process.exe().unwrap_or_default().to_str().unwrap_or("")),
             inodes: Vec::new()
         };
