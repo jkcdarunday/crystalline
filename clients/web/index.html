@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.7.8/angular.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.15/lodash.js"></script>
+    <title>CrystalLine Test Client</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div ng-app="app" ng-controller="coreController">
+    <table class="connections">
+        <tr>
+            <th>Source</th>
+            <th>Destination</th>
+            <th>Process</th>
+            <th>Downloaded</th>
+            <th>Uploaded</th>
+        </tr>
+        <tr ng-repeat="connection in results.connections">
+            <td>{{connection.source}}</td>
+            <td>{{connection.destination}}</td>
+            <td>{{ findProcess(connection.inode) }}</td>
+            <td class="centered">{{fs(connection.bytes_downloaded)}}</td>
+            <td class="centered">{{fs(connection.bytes_uploaded)}}</td>
+        </tr>
+    </table>
+    <script src="main.js" defer></script>
+</div>
+</body>
+</html>

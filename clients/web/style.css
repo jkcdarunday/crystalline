@@ -1,0 +1,21 @@
+body {
+    font-family: 'Noto Sans Light', 'Open Sans Light', sans-serif;
+    font-weight: 300;
+    padding: 20px;
+}
+
+.connections {
+    margin: 0 auto;
+}
+
+.connections th {
+    padding: 0 50px;
+}
+
+.connections td {
+    font-family: 'Source Code Pro', 'Noto Sans Mono', monospace;
+}
+
+.connections td.centered {
+    text-align: center;
+}
