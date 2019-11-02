@@ -124,4 +124,6 @@ fn update_connections_with_bytes_transferred(connections: &mut Connections, conn
         new_connection.bytes_uploaded = bytes_transferred;
         connections.push(new_connection);
     }
+
+    connections.sort_unstable();
 }

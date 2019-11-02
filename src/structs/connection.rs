@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use procfs::net::{TcpNetEntry, UdpNetEntry};
 use serde_derive::Serialize;
+use std::cmp::Ordering;
 
 #[derive(Hash, Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum TransportType {
@@ -9,7 +10,7 @@ pub enum TransportType {
     Udp,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Eq)]
 pub struct Connection {
     pub source: SocketAddr,
     pub destination: SocketAddr,
@@ -52,6 +53,18 @@ impl PartialEq for Connection {
         self.transport_type == other.transport_type
             && ((self.source == other.source && self.destination == other.destination)
                 || (self.source == other.destination && self.destination == other.source))
+    }
+}
+
+impl Ord for Connection {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl PartialOrd for Connection {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some((self.bytes_uploaded + self.bytes_uploaded).cmp(&(other.bytes_uploaded + other.bytes_downloaded)))
     }
 }
 

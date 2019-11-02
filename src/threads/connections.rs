@@ -20,7 +20,7 @@ pub fn run(interval: u64) -> (JoinHandle<()>, ConnectionsReceiver) {
 }
 
 pub fn get_tcp_connection_inodes() -> Connections {
-    let mut connections = Vec::new();
+    let mut connections = Connections::new();
 
     for entry in procfs::net::tcp().unwrap() {
         connections.push(Connection::from(entry));
