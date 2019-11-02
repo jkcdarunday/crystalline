@@ -11,18 +11,13 @@ use pcap::{Device, Packet};
 use single_value_channel;
 
 use crate::structs::connection::{Connection, Connections, TransportType};
-use crate::structs::receivers::{CaptureReceiver, ConnectionsReceiver, ProcessesReceiver};
-use crate::threads;
+use crate::structs::receivers::{CaptureReceiver, ConnectionsReceiver};
 
-pub fn run(connections_thread: ConnectionsReceiver, mut processes_thread: ProcessesReceiver) -> (JoinHandle<()>, CaptureReceiver) {
+pub fn run(connections_thread: ConnectionsReceiver) -> (JoinHandle<()>, CaptureReceiver) {
 //    let (sender, receiver) = channel();
     let (receiver, updater) = single_value_channel::channel();
 
     let handle = thread::spawn(move || {
-        let _process_inodes = match processes_thread.latest() {
-            Some(inodes) => inodes.clone(),
-            None => threads::processes::get_inodes_per_process()
-        };
         let mut connections = Connections::new();
 
         let devices = Device::list().unwrap();

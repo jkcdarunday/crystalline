@@ -2,32 +2,38 @@ use std::sync::Mutex;
 
 use actix_cors::Cors;
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, middleware, web};
+use serde_json::json;
 
 use crate::structs::connection::Connections;
-use crate::structs::receivers::CaptureReceiver;
+use crate::structs::receivers::{CaptureReceiver, ProcessesReceiver};
 
 mod structs;
 mod threads;
 
-fn index(state: web::Data<Mutex<(CaptureReceiver, Connections)>>, req: HttpRequest) -> HttpResponse {
+fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections)>>, _req: HttpRequest) -> HttpResponse {
     let mut locked_state = state.lock().unwrap();
 
-    let (ref mut receiver, ref mut connections) = *locked_state;
+    let (ref mut receiver, ref mut processes_receiver, ref mut connections) = *locked_state;
 
     if let Some(latest_connections) = receiver.latest() {
         *connections = latest_connections.clone()
     }
 
-    HttpResponse::Ok().json(connections)
+    let processes = match processes_receiver.latest() {
+        Some(latest_processes) => latest_processes.clone(),
+        None => vec![]
+    };
+
+    HttpResponse::Ok().json(json!({"connections": connections, "processes": processes}))
 }
 
 fn main() -> std::io::Result<()> {
     let (_, connections_thread) = threads::connections::run(200);
     let (_, processes_thread) = threads::processes::run(200);
-    let (_, capture_thread) = threads::capture::run(connections_thread, processes_thread);
+    let (_, capture_thread) = threads::capture::run(connections_thread);
 
 
-    let state = web::Data::new(Mutex::new((capture_thread, Connections::new())));
+    let state = web::Data::new(Mutex::new((capture_thread, processes_thread, Connections::new())));
 
     HttpServer::new(move || App::new()
         .register_data(state.clone())
