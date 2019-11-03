@@ -28,7 +28,12 @@ fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections
         connection.bind_matching_process(processes);
     }
 
-    HttpResponse::Ok().json(json!({"connections": connections, "processes": processes}))
+    let filtered_processes: ProcessInfos = processes.iter()
+        .filter(|&(_, process)| !process.executable.is_empty())
+        .map(|(pid, process)| (pid.clone(), process.clone()))
+        .collect();
+
+    HttpResponse::Ok().json(json!({"connections": connections, "processes": filtered_processes}))
 }
 
 fn main() -> std::io::Result<()> {
