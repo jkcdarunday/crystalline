@@ -39,7 +39,7 @@ pub fn get_inodes_per_process() -> ProcessInfos {
             }
         }
 
-        process_infos.push(process_info);
+        process_infos.insert(process_info.pid, process_info);
     }
 
     process_infos

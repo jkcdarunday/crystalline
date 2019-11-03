@@ -1,8 +1,11 @@
+use std::cmp::Ordering;
 use std::net::SocketAddr;
 
+use libc::pid_t;
 use procfs::net::{TcpNetEntry, UdpNetEntry};
 use serde_derive::Serialize;
-use std::cmp::Ordering;
+
+use crate::structs::process::ProcessInfos;
 
 #[derive(Hash, Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum TransportType {
@@ -15,6 +18,7 @@ pub struct Connection {
     pub source: SocketAddr,
     pub destination: SocketAddr,
     pub inode: u32,
+    pub process_id: pid_t,
     pub transport_type: TransportType,
     pub bytes_uploaded: usize,
     pub bytes_downloaded: usize,
@@ -28,6 +32,7 @@ impl From<TcpNetEntry> for Connection {
             source: entry.local_address,
             destination: entry.remote_address,
             inode: entry.inode,
+            process_id: 0,
             transport_type: TransportType::Tcp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
@@ -41,6 +46,7 @@ impl From<UdpNetEntry> for Connection {
             source: entry.local_address,
             destination: entry.remote_address,
             inode: entry.inode,
+            process_id: 0,
             transport_type: TransportType::Udp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
@@ -65,6 +71,17 @@ impl Ord for Connection {
 impl PartialOrd for Connection {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some((self.bytes_uploaded + self.bytes_uploaded).cmp(&(other.bytes_uploaded + other.bytes_downloaded)))
+    }
+}
+
+impl Connection {
+    pub fn bind_matching_process (&mut self, processes: &ProcessInfos) {
+        for (process_id, process_info) in processes {
+            if process_info.inodes.contains(&self.inode) {
+                self.process_id = process_id.clone();
+                break;
+            }
+        }
     }
 }
 

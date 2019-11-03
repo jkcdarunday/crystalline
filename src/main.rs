@@ -21,7 +21,11 @@ fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections
     }
 
     if let Some(latest_processes) = processes_receiver.latest() {
-        processes.append(&mut latest_processes.clone());
+        processes.extend(latest_processes.clone());
+    }
+
+    for connection in connections.iter_mut() {
+        connection.bind_matching_process(processes);
     }
 
     HttpResponse::Ok().json(json!({"connections": connections, "processes": processes}))
