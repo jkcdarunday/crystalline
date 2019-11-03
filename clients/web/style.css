@@ -12,6 +12,10 @@ body {
     padding: 0 50px;
 }
 
+.connections .error {
+    color: red;
+}
+
 .connections td {
     font-family: 'Source Code Pro', 'Noto Sans Mono', monospace;
 }

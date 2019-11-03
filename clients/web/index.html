@@ -21,10 +21,10 @@
             <th>Downloaded</th>
             <th>Uploaded</th>
         </tr>
-        <tr ng-repeat="connection in results.connections">
+        <tr ng-repeat="connection in results.connections" ng-class="{error: connection.inode == 0}">
             <td>{{connection.source}}</td>
             <td>{{connection.destination}}</td>
-            <td>{{ findProcess(connection.inode) }}</td>
+            <td>{{ findProcess(connection.process_id) }}</td>
             <td class="centered">{{fs(connection.bytes_downloaded)}}</td>
             <td class="centered">{{fs(connection.bytes_uploaded)}}</td>
         </tr>

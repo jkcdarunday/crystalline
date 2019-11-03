@@ -22,8 +22,8 @@ angular.module('app', []).constant('_', window._).controller('coreController', f
 
     timer();
 
-    $scope.findProcess = (inode) => {
-        const process = _.find($scope.results.processes, process => _.includes(process.inodes, inode));
+    $scope.findProcess = (pid) => {
+        const process = $scope.results.processes[`${pid}`];
         return _.get(process, 'executable') || _.get(process, 'command') || _.get(process, 'pid');
     };
 
