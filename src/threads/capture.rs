@@ -127,5 +127,5 @@ fn update_connections_with_bytes_transferred(connections: &mut Connections, conn
         connections.push(new_connection);
     }
 
-    connections.sort_unstable();
+    connections.sort_unstable_by(|a, b| b.cmp(a));
 }
