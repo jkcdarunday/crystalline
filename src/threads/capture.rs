@@ -3,6 +3,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::SystemTime;
 
 use etherparse::InternetSlice::Ipv4;
 use etherparse::InternetSlice::Ipv6;
@@ -103,6 +104,8 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
             transport_type: TransportType::Tcp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
+            first_seen: SystemTime::now(),
+            last_seen: SystemTime::now(),
         },
         Udp(header) => Connection {
             source: SocketAddr::new(source_ip, header.source_port()),
@@ -112,6 +115,8 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
             transport_type: TransportType::Udp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
+            first_seen: SystemTime::now(),
+            last_seen: SystemTime::now(),
         },
         _ => return Err("Received non-tcp/udp packet".to_string())
     };

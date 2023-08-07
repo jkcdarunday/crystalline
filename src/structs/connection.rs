@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
+use std::time::SystemTime;
 
 use libc::pid_t;
 use procfs::net::{TcpNetEntry, UdpNetEntry};
@@ -22,6 +24,8 @@ pub struct Connection {
     pub transport_type: TransportType,
     pub bytes_uploaded: usize,
     pub bytes_downloaded: usize,
+    pub first_seen: SystemTime,
+    pub last_seen: SystemTime,
 }
 
 pub type Connections = Vec<Connection>;
@@ -36,6 +40,8 @@ impl From<TcpNetEntry> for Connection {
             transport_type: TransportType::Tcp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
+            first_seen: SystemTime::now(),
+            last_seen: SystemTime::now(),
         }
     }
 }
@@ -50,6 +56,8 @@ impl From<UdpNetEntry> for Connection {
             transport_type: TransportType::Udp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
+            first_seen: SystemTime::now(),
+            last_seen: SystemTime::now(),
         }
     }
 }
@@ -59,6 +67,19 @@ impl PartialEq for Connection {
         self.transport_type == other.transport_type
             && ((self.source == other.source && self.destination == other.destination)
                 || (self.source == other.destination && self.destination == other.source))
+    }
+}
+
+impl Hash for Connection {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.transport_type.hash(state);
+        if self.source < self.destination {
+            self.source.hash(state);
+            self.destination.hash(state);
+        } else {
+            self.destination.hash(state);
+            self.source.hash(state);
+        }
     }
 }
 
