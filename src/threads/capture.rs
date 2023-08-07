@@ -54,8 +54,8 @@ fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiv
     while let Ok(packet) = cap.next_packet() {
         {
             let mut connections = connections_mutex.lock().unwrap();
-            let receiver = receiver_mutex.lock().unwrap();
-            update_connections_with_inodes_from_receiver(&mut connections, &receiver);
+            let mut receiver = receiver_mutex.lock().unwrap();
+            update_connections_with_inodes_from_receiver(&mut connections, &mut receiver);
         }
 
         match process_packet(packet) {
@@ -121,21 +121,25 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
     Ok((connection, packet_size))
 }
 
-fn update_connections_with_inodes_from_receiver(connections: &mut Connections, receiver: &ConnectionsReceiver) {
-    while let Ok(new_connections) = receiver.try_recv() {
-        for new_connection in new_connections {
-            if let Some(found_connection) = connections.iter_mut().find(|current| **current == new_connection) {
-                if found_connection.inode == 0 {
-                    found_connection.inode = new_connection.inode;
-                }
+fn update_connections_with_inodes_from_receiver(connections: &mut Connections, receiver: &mut ConnectionsReceiver) {
+    let new_connections = match receiver.latest() {
+        Some(connections) => connections,
+        None => return
+    };
 
-                if found_connection.source == new_connection.destination {
-                    swap(&mut found_connection.source, &mut found_connection.destination);
-                    swap(&mut found_connection.bytes_uploaded, &mut found_connection.bytes_downloaded);
-                }
-            } else {
-                connections.push(new_connection);
+    for new_connection in new_connections {
+        let find_connection_result = connections.iter_mut().find(|current| **current == *new_connection);
+        if let Some(found_connection) = find_connection_result {
+            if found_connection.inode == 0 {
+                found_connection.inode = new_connection.inode;
             }
+
+            if found_connection.source == new_connection.destination {
+                swap(&mut found_connection.source, &mut found_connection.destination);
+                swap(&mut found_connection.bytes_uploaded, &mut found_connection.bytes_downloaded);
+            }
+        } else {
+            connections.push(new_connection.clone());
         }
     }
 }
