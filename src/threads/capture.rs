@@ -9,7 +9,7 @@ use etherparse::InternetSlice::Ipv4;
 use etherparse::InternetSlice::Ipv6;
 use etherparse::SlicedPacket;
 use etherparse::TransportSlice::{Tcp, Udp};
-use pcap::{Device, Packet};
+use pcap::{Device, Linktype, Packet};
 use single_value_channel;
 use crate::helpers::debug::is_debug;
 use crate::helpers::display::print_devices;
@@ -53,6 +53,7 @@ pub fn run(connections_thread: ConnectionsReceiver, device_name: &Option<String>
 fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiver_mutex: &Mutex<ConnectionsReceiver>, updater_mutex: &Mutex<CaptureUpdater>) {
     let addresses = device.addresses.iter().map(|address| address.addr).collect::<Vec<IpAddr>>();
     let mut cap = device.open().expect("Failed to load device");
+    let link_type = cap.get_datalink();
 
     while let Ok(packet) = cap.next_packet() {
         {
@@ -61,7 +62,7 @@ fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiv
             update_connections_with_inodes_from_receiver(&mut connections, &mut receiver);
         }
 
-        match process_packet(packet) {
+        match process_packet(packet, link_type) {
             Err(error) => if is_debug() { println!("Error: {}", error) },
             Ok((connection, bytes_transferred)) => {
                 let mut connections = connections_mutex.lock().unwrap();
@@ -73,9 +74,13 @@ fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiv
     }
 }
 
-fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::String> {
+fn process_packet(packet: Packet, link_type: Linktype) -> Result<(Connection, usize), std::string::String> {
     // Parse packet
-    let packet_parse_result = SlicedPacket::from_ethernet(&packet);
+    let packet_parse_result = match link_type {
+        Linktype(12) | Linktype::NULL => SlicedPacket::from_ip(&packet),
+        Linktype::ETHERNET => SlicedPacket::from_ethernet(&packet),
+        _ => return Err(format!("Unsupported link type {:?}", link_type.get_description()))
+    };
     if let Err(error) = packet_parse_result {
         return Err(format!("Error in parsing packet: {:?}", error));
     }
