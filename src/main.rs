@@ -40,9 +40,11 @@ async fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Conne
 }
 
 fn main() -> std::io::Result<()> {
+    let device_name = env::args().nth(1);
+
     let (_, connections_thread) = threads::connections::run(200);
     let (_, processes_thread) = threads::processes::run(200);
-    let (_, capture_thread) = threads::capture::run(connections_thread);
+    let (_, capture_thread) = threads::capture::run(connections_thread, &device_name);
 
 
     let state = web::Data::new(Mutex::new((capture_thread, processes_thread, Connections::new(), ProcessInfos::new())));

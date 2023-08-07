@@ -11,7 +11,7 @@ pub fn format_addresses(addresses: &Vec<Address>) -> String {
 }
 
 pub fn print_devices(devices: &Vec<Device>) {
-    println!("Devices:");
+    println!("Target devices:");
     for device in devices {
         println!("\t- {}: {}", device.name, format_addresses(&device.addresses));
     }

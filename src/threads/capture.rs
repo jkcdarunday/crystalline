@@ -17,11 +17,15 @@ use crate::structs::receivers::{CaptureReceiver, ConnectionsReceiver};
 
 pub type CaptureUpdater = single_value_channel::Updater<Option<Connections>>;
 
-pub fn run(connections_thread: ConnectionsReceiver) -> (Vec<JoinHandle<()>>, CaptureReceiver) {
+pub fn run(connections_thread: ConnectionsReceiver, device_name: &Option<String>) -> (Vec<JoinHandle<()>>, CaptureReceiver) {
     let (receiver, updater) = single_value_channel::channel();
 
     let devices = Device::list().unwrap().into_iter().filter(|device|{
-        !device.flags.is_loopback() && device.flags.is_up() && device.flags.is_running() && device.name != "any"
+        !device.flags.is_loopback()
+            && device.flags.is_up()
+            && device.flags.is_running()
+            && device.name != "any"
+            && (device_name.is_none() || device.name == *device_name.as_ref().unwrap())
     }).collect();
     print_devices(&devices);
 
