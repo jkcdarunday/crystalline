@@ -8,7 +8,7 @@ pub struct ProcessInfo {
     pub pid: pid_t,
     pub command: String,
     pub executable: String,
-    pub inodes: Vec<u32>,
+    pub inodes: Vec<u64>,
 }
 
 pub type ProcessInfos = HashMap<pid_t, ProcessInfo>;

@@ -20,7 +20,12 @@ pub fn run(interval: u64) -> (JoinHandle<()>, single_value_channel::Receiver<Opt
 pub fn get_inodes_per_process() -> ProcessInfos {
     let mut process_infos = ProcessInfos::new();
 
-    for process in procfs::process::all_processes().unwrap() {
+    for process_result in procfs::process::all_processes().unwrap() {
+        let process = match process_result {
+            Ok(process) => process,
+            Err(_) => continue,
+        };
+
         let mut process_info = ProcessInfo {
             pid: process.pid(),
             command: process.cmdline().unwrap_or_default().join(" "),
@@ -29,7 +34,12 @@ pub fn get_inodes_per_process() -> ProcessInfos {
         };
 
         if let Ok(file_descriptors) = process.fd() {
-            for file_descriptor in file_descriptors {
+            for file_descriptor_result in file_descriptors {
+                let file_descriptor = match file_descriptor_result {
+                    Ok(file_descriptor) => file_descriptor,
+                    Err(_) => continue,
+                };
+
                 match file_descriptor.target {
                     Socket(inode) | Net(inode) | Pipe(inode) | Other(_, inode) => {
                         process_info.inodes.push(inode)

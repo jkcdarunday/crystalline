@@ -17,7 +17,7 @@ pub enum TransportType {
 pub struct Connection {
     pub source: SocketAddr,
     pub destination: SocketAddr,
-    pub inode: u32,
+    pub inode: u64,
     pub process_id: pid_t,
     pub transport_type: TransportType,
     pub bytes_uploaded: usize,

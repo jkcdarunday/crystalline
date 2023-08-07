@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use actix_cors::Cors;
-use actix_web::{App, HttpRequest, HttpResponse, HttpServer, middleware, web};
+use actix_web::{App, rt, get, HttpResponse, HttpServer, middleware, web};
 use serde_json::json;
 
 use crate::structs::connection::Connections;
@@ -11,7 +11,8 @@ use crate::structs::process::ProcessInfos;
 mod structs;
 mod threads;
 
-fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections, ProcessInfos)>>, _req: HttpRequest) -> HttpResponse {
+#[get("/")]
+async fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Connections, ProcessInfos)>>) -> HttpResponse {
     let mut locked_state = state.lock().unwrap();
 
     let (ref mut receiver, ref mut processes_receiver, ref mut connections, ref mut processes) = *locked_state;
@@ -44,12 +45,14 @@ fn main() -> std::io::Result<()> {
 
     let state = web::Data::new(Mutex::new((capture_thread, processes_thread, Connections::new(), ProcessInfos::new())));
 
-    HttpServer::new(move || App::new()
-        .register_data(state.clone())
-        .wrap(middleware::Logger::default())
-        .wrap(Cors::new().allowed_methods(vec!["GET"]).max_age(3600))
-        .service(web::resource("/").to(index))
-    )
+    rt::System::new().block_on(HttpServer::new(move || {
+        App::new()
+            .app_data(state.clone())
+            .wrap(middleware::Logger::default())
+            .wrap(Cors::permissive().allowed_methods(vec!["GET"]).max_age(3600))
+            .service(index)
+    })
         .bind("127.0.0.1:8080")?
         .run()
+    )
 }

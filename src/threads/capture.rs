@@ -22,14 +22,14 @@ pub fn run(connections_thread: ConnectionsReceiver) -> (JoinHandle<()>, CaptureR
 
         let devices = Device::list().unwrap();
         let device = devices.into_iter()
-            .find(|device| device.name == "wlo1".to_string())
+            .find(|device| device.name == "wlan0".to_string())
             .unwrap();
 
         println!("device: {:?}", device);
 
         let mut cap = device.open().expect("Failed to load device");
 
-        while let Ok(packet) = cap.next() {
+        while let Ok(packet) = cap.next_packet() {
             update_connections_with_inodes_from_receiver(&mut connections, &connections_thread);
 
             match process_packet(packet) {
@@ -65,7 +65,7 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
     }
 
     let (source_ip, destination_ip) = match packet_data.ip.unwrap() {
-        Ipv4(header) => (IpAddr::V4(header.source_addr()), IpAddr::V4(header.destination_addr())),
+        Ipv4(header, _) => (IpAddr::V4(header.source_addr()), IpAddr::V4(header.destination_addr())),
         Ipv6(header, _) => (IpAddr::V6(header.source_addr()), IpAddr::V6(header.destination_addr()))
     };
 
@@ -87,7 +87,8 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
             transport_type: TransportType::Udp,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
-        }
+        },
+        _ => return Err("Received non-tcp/udp packet".to_string())
     };
 
     let packet_size = packet.len();
@@ -98,7 +99,7 @@ fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::St
 fn update_connections_with_inodes_from_receiver(connections: &mut Connections, receiver: &ConnectionsReceiver) {
     while let Ok(new_connections) = receiver.try_recv() {
         for new_connection in new_connections {
-            if let Some(mut found_connection) = connections.iter_mut().find(|current| **current == new_connection) {
+            if let Some(found_connection) = connections.iter_mut().find(|current| **current == new_connection) {
                 if found_connection.inode == 0 {
                     found_connection.inode = new_connection.inode;
                 }
@@ -115,7 +116,7 @@ fn update_connections_with_inodes_from_receiver(connections: &mut Connections, r
 }
 
 fn update_connections_with_bytes_transferred(connections: &mut Connections, connection: Connection, bytes_transferred: usize) {
-    if let Some(mut found_connection) = connections.iter_mut().find(|current| **current == connection) {
+    if let Some(found_connection) = connections.iter_mut().find(|current| **current == connection) {
         if found_connection.source == connection.source {
             found_connection.bytes_uploaded += bytes_transferred;
         } else {
