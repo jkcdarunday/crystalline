@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use crate::helpers::debug::is_debug;
 
 use crate::structs::connection::{Connection, Connections};
 use crate::structs::receivers::ConnectionsReceiver;
@@ -18,7 +19,10 @@ pub fn run(interval: u64) -> (JoinHandle<()>, ConnectionsReceiver) {
 
             let connections_arr: Vec<Connection> = connections.iter().cloned().collect();
             updater.update(Some(connections_arr)).unwrap();
-            println!("Connection count: {}", connections.len());
+
+            if is_debug() {
+                println!("Connection count: {}", connections.len());
+            }
             thread::sleep(Duration::from_millis(interval));
         }
     });

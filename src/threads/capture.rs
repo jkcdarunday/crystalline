@@ -11,6 +11,7 @@ use etherparse::SlicedPacket;
 use etherparse::TransportSlice::{Tcp, Udp};
 use pcap::{Device, Packet};
 use single_value_channel;
+use crate::helpers::debug::is_debug;
 use crate::helpers::display::print_devices;
 
 use crate::structs::connection::{Connection, Connections, TransportType};
@@ -61,7 +62,7 @@ fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiv
         }
 
         match process_packet(packet) {
-            Err(error) => println!("Error: {}", error),
+            Err(error) => if is_debug() { println!("Error: {}", error) },
             Ok((connection, bytes_transferred)) => {
                 let mut connections = connections_mutex.lock().unwrap();
                 let updater = updater_mutex.lock().unwrap();
@@ -157,14 +158,18 @@ fn update_connections_with_bytes_transferred(connections: &mut Connections, conn
         match addresses {
             a if a.contains(&src) => found_connection.bytes_uploaded += bytes_transferred,
             a if a.contains(&dest) => found_connection.bytes_downloaded += bytes_transferred,
-            _ => println!("Unmatched connection address: {} => {} (valid values: {:?})", src, dest, addresses)
+            _ => if is_debug() {
+                println!("Unmatched connection address: {} => {} (valid values: {:?})", src, dest, addresses)
+            }
         }
     } else {
         let mut new_connection = connection.clone();
         match addresses {
             a if a.contains(&new_connection.source.ip()) => new_connection.bytes_uploaded = bytes_transferred,
             a if a.contains(&new_connection.destination.ip()) => new_connection.bytes_downloaded = bytes_transferred,
-            _ => println!("Unmatched connection address: {} => {} (valid values: {:?})", new_connection.source.ip(), new_connection.destination.ip(), addresses)
+            _ => if is_debug() {
+                println!("Unmatched connection address: {} => {} (valid values: {:?})", new_connection.source.ip(), new_connection.destination.ip(), addresses)
+            }
         }
         connections.push(new_connection);
     }
