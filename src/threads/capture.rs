@@ -1,7 +1,7 @@
 use std::mem::swap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{thread};
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 
@@ -32,12 +32,12 @@ pub fn run(connections_thread: ConnectionsReceiver, device_name: &Option<String>
 
     let connections_mutex = Arc::new(Mutex::new(Connections::new()));
     let receiver_mutex = Arc::new(Mutex::new(connections_thread));
-    let updater = Arc::new(Mutex::new(updater));
+    let updater_mutex = Arc::new(Mutex::new(updater));
     let handles: Vec<JoinHandle<()>> = devices.into_iter()
         .map(|device| {
         let connections_mutex_instance = connections_mutex.clone();
         let receiver_mutex_instance = receiver_mutex.clone();
-        let updater = updater.clone();
+        let updater = updater_mutex.clone();
 
         thread::spawn(move ||
             monitor_device(device, &connections_mutex_instance, &receiver_mutex_instance, &updater)
@@ -50,6 +50,7 @@ pub fn run(connections_thread: ConnectionsReceiver, device_name: &Option<String>
 }
 
 fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiver_mutex: &Mutex<ConnectionsReceiver>, updater_mutex: &Mutex<CaptureUpdater>) {
+    let addresses = device.addresses.iter().map(|address| address.addr).collect::<Vec<IpAddr>>();
     let mut cap = device.open().expect("Failed to load device");
 
     while let Ok(packet) = cap.next_packet() {
@@ -64,7 +65,7 @@ fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiv
             Ok((connection, bytes_transferred)) => {
                 let mut connections = connections_mutex.lock().unwrap();
                 let updater = updater_mutex.lock().unwrap();
-                update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred);
+                update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred, &addresses);
                 updater.update(Some(connections.clone())).unwrap();
             }
         };
@@ -149,16 +150,22 @@ fn update_connections_with_inodes_from_receiver(connections: &mut Connections, r
     }
 }
 
-fn update_connections_with_bytes_transferred(connections: &mut Connections, connection: Connection, bytes_transferred: usize) {
+fn update_connections_with_bytes_transferred(connections: &mut Connections, connection: Connection, bytes_transferred: usize, addresses: &Vec<IpAddr>) {
     if let Some(found_connection) = connections.iter_mut().find(|current| **current == connection) {
-        if found_connection.source == connection.source {
-            found_connection.bytes_uploaded += bytes_transferred;
-        } else {
-            found_connection.bytes_downloaded += bytes_transferred;
+        let src = found_connection.source.ip();
+        let dest = found_connection.destination.ip();
+        match addresses {
+            a if a.contains(&src) => found_connection.bytes_uploaded += bytes_transferred,
+            a if a.contains(&dest) => found_connection.bytes_downloaded += bytes_transferred,
+            _ => println!("Unmatched connection address: {} => {} (valid values: {:?})", src, dest, addresses)
         }
     } else {
         let mut new_connection = connection.clone();
-        new_connection.bytes_uploaded = bytes_transferred;
+        match addresses {
+            a if a.contains(&new_connection.source.ip()) => new_connection.bytes_uploaded = bytes_transferred,
+            a if a.contains(&new_connection.destination.ip()) => new_connection.bytes_downloaded = bytes_transferred,
+            _ => println!("Unmatched connection address: {} => {} (valid values: {:?})", new_connection.source.ip(), new_connection.destination.ip(), addresses)
+        }
         connections.push(new_connection);
     }
 
