@@ -1,5 +1,6 @@
 use std::mem::swap;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
@@ -9,40 +10,60 @@ use etherparse::SlicedPacket;
 use etherparse::TransportSlice::{Tcp, Udp};
 use pcap::{Device, Packet};
 use single_value_channel;
+use crate::helpers::display::print_devices;
 
 use crate::structs::connection::{Connection, Connections, TransportType};
 use crate::structs::receivers::{CaptureReceiver, ConnectionsReceiver};
 
-pub fn run(connections_thread: ConnectionsReceiver) -> (JoinHandle<()>, CaptureReceiver) {
-//    let (sender, receiver) = channel();
+pub type CaptureUpdater = single_value_channel::Updater<Option<Connections>>;
+
+pub fn run(connections_thread: ConnectionsReceiver) -> (Vec<JoinHandle<()>>, CaptureReceiver) {
     let (receiver, updater) = single_value_channel::channel();
 
-    let handle = thread::spawn(move || {
-        let mut connections = Connections::new();
+    let devices = Device::list().unwrap().into_iter().filter(|device|{
+        !device.flags.is_loopback() && device.flags.is_up() && device.flags.is_running() && device.name != "any"
+    }).collect();
+    print_devices(&devices);
 
-        let devices = Device::list().unwrap();
-        let device = devices.into_iter()
-            .find(|device| device.name == "wlan0".to_string())
-            .unwrap();
+    let connections_mutex = Arc::new(Mutex::new(Connections::new()));
+    let receiver_mutex = Arc::new(Mutex::new(connections_thread));
+    let updater = Arc::new(Mutex::new(updater));
+    let handles: Vec<JoinHandle<()>> = devices.into_iter()
+        .map(|device| {
+        let connections_mutex_instance = connections_mutex.clone();
+        let receiver_mutex_instance = receiver_mutex.clone();
+        let updater = updater.clone();
 
-        println!("device: {:?}", device);
+        thread::spawn(move ||
+            monitor_device(device, &connections_mutex_instance, &receiver_mutex_instance, &updater)
+        )
+    }).collect();
 
-        let mut cap = device.open().expect("Failed to load device");
+    println!("Started {} capture threads", handles.len());
 
-        while let Ok(packet) = cap.next_packet() {
-            update_connections_with_inodes_from_receiver(&mut connections, &connections_thread);
+    (handles, receiver)
+}
 
-            match process_packet(packet) {
-                Err(_error) => {} //println!("Error: {}", error),
-                Ok((connection, bytes_transferred)) => {
-                    update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred);
-                    updater.update(Some(connections.clone())).unwrap();
-                }
-            };
+fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiver_mutex: &Mutex<ConnectionsReceiver>, updater_mutex: &Mutex<CaptureUpdater>) {
+    let mut cap = device.open().expect("Failed to load device");
+
+    while let Ok(packet) = cap.next_packet() {
+        {
+            let mut connections = connections_mutex.lock().unwrap();
+            let receiver = receiver_mutex.lock().unwrap();
+            update_connections_with_inodes_from_receiver(&mut connections, &receiver);
         }
-    });
 
-    (handle, receiver)
+        match process_packet(packet) {
+            Err(error) => println!("Error: {}", error),
+            Ok((connection, bytes_transferred)) => {
+                let mut connections = connections_mutex.lock().unwrap();
+                let updater = updater_mutex.lock().unwrap();
+                update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred);
+                updater.update(Some(connections.clone())).unwrap();
+            }
+        };
+    }
 }
 
 fn process_packet(packet: Packet) -> Result<(Connection, usize), std::string::String> {
