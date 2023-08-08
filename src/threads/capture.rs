@@ -1,4 +1,3 @@
-use std::mem::swap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::{thread};
@@ -18,6 +17,11 @@ use crate::structs::connection::{Connection, Connections, TransportType};
 use crate::structs::receivers::{CaptureReceiver, ConnectionsReceiver};
 
 pub type CaptureUpdater = single_value_channel::Updater<Option<Connections>>;
+
+pub enum Direction {
+    Incoming,
+    Outgoing,
+}
 
 pub fn run(connections_thread: ConnectionsReceiver, device_name: &Option<String>) -> (Vec<JoinHandle<()>>, CaptureReceiver) {
     let (receiver, updater) = single_value_channel::channel();
@@ -62,19 +66,20 @@ fn monitor_device(device: Device, connections_mutex: &Mutex<Connections>, receiv
             update_connections_with_inodes_from_receiver(&mut connections, &mut receiver);
         }
 
-        match process_packet(packet, link_type) {
+        match process_packet(packet, link_type, &addresses) {
             Err(error) => if is_debug() { println!("Error: {}", error) },
-            Ok((connection, bytes_transferred)) => {
+            Ok((connection, bytes_transferred, direction)) => {
                 let mut connections = connections_mutex.lock().unwrap();
                 let updater = updater_mutex.lock().unwrap();
-                update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred, &addresses);
+
+                update_connections_with_bytes_transferred(&mut connections, connection, bytes_transferred, direction);
                 updater.update(Some(connections.clone())).unwrap();
             }
         };
     }
 }
 
-fn process_packet(packet: Packet, link_type: Linktype) -> Result<(Connection, usize), std::string::String> {
+fn process_packet(packet: Packet, link_type: Linktype, addresses: &Vec<IpAddr>) -> Result<(Connection, usize, Direction), String> {
     // Parse packet
     let packet_parse_result = match link_type {
         Linktype(12) | Linktype::NULL => SlicedPacket::from_ip(&packet),
@@ -130,7 +135,13 @@ fn process_packet(packet: Packet, link_type: Linktype) -> Result<(Connection, us
 
     let packet_size = packet.len();
 
-    Ok((connection, packet_size))
+    let direction = match addresses {
+        _ if addresses.contains(&source_ip) => Direction::Outgoing,
+        _ if addresses.contains(&destination_ip) => Direction::Incoming,
+        _ => return Err("Packet not from or to monitored device".to_string())
+    };
+
+    Ok((connection, packet_size, direction))
 }
 
 fn update_connections_with_inodes_from_receiver(connections: &mut Connections, receiver: &mut ConnectionsReceiver) {
@@ -145,36 +156,23 @@ fn update_connections_with_inodes_from_receiver(connections: &mut Connections, r
             if found_connection.inode == 0 {
                 found_connection.inode = new_connection.inode;
             }
-
-            if found_connection.source == new_connection.destination {
-                swap(&mut found_connection.source, &mut found_connection.destination);
-                swap(&mut found_connection.bytes_uploaded, &mut found_connection.bytes_downloaded);
-            }
         } else {
             connections.push(new_connection.clone());
         }
     }
 }
 
-fn update_connections_with_bytes_transferred(connections: &mut Connections, connection: Connection, bytes_transferred: usize, addresses: &Vec<IpAddr>) {
+fn update_connections_with_bytes_transferred(connections: &mut Connections, connection: Connection, bytes_transferred: usize, direction: Direction) {
     if let Some(found_connection) = connections.iter_mut().find(|current| **current == connection) {
-        let src = found_connection.source.ip();
-        let dest = found_connection.destination.ip();
-        match addresses {
-            a if a.contains(&src) => found_connection.bytes_uploaded += bytes_transferred,
-            a if a.contains(&dest) => found_connection.bytes_downloaded += bytes_transferred,
-            _ => if is_debug() {
-                println!("Unmatched connection address: {} => {} (valid values: {:?})", src, dest, addresses)
-            }
+        match direction {
+            Direction::Outgoing => found_connection.bytes_uploaded += bytes_transferred,
+            Direction::Incoming => found_connection.bytes_downloaded += bytes_transferred,
         }
     } else {
         let mut new_connection = connection.clone();
-        match addresses {
-            a if a.contains(&new_connection.source.ip()) => new_connection.bytes_uploaded = bytes_transferred,
-            a if a.contains(&new_connection.destination.ip()) => new_connection.bytes_downloaded = bytes_transferred,
-            _ => if is_debug() {
-                println!("Unmatched connection address: {} => {} (valid values: {:?})", new_connection.source.ip(), new_connection.destination.ip(), addresses)
-            }
+        match direction {
+            Direction::Outgoing => new_connection.bytes_uploaded += bytes_transferred,
+            Direction::Incoming => new_connection.bytes_downloaded += bytes_transferred,
         }
         connections.push(new_connection);
     }
