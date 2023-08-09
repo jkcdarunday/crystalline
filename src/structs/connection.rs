@@ -99,7 +99,7 @@ impl Connection {
     pub fn bind_matching_process (&mut self, processes: &ProcessInfos) {
         for (process_id, process_info) in processes {
             if process_info.inodes.contains(&self.inode) {
-                self.process_id = process_id.clone();
+                self.process_id = *process_id;
                 break;
             }
         }

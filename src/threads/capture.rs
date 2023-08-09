@@ -93,12 +93,12 @@ fn process_packet(packet: Packet, link_type: Linktype, addresses: &Vec<IpAddr>) 
 
 
     // Get source and destination IPs
-    if packet_data.ip == None {
+    if packet_data.ip.is_none() {
         return Err("Received non-ip packet".to_string());
     }
 
     // Get transport type
-    if packet_data.transport == None {
+    if packet_data.transport.is_none() {
         return Err("Received non-tcp/udp packet".to_string());
     }
 

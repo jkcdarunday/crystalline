@@ -36,7 +36,7 @@ pub fn update_connections(
 ) {
     for connection in current_connections {
         let find_connection_result = connections.iter().find(|c| **c == *connection);
-        if let Some(&ref found_connection) = find_connection_result {
+        if let Some(found_connection) = find_connection_result {
             let mut new_connection = found_connection.clone();
             new_connection.last_seen = connection.last_seen;
             connections.replace(new_connection);

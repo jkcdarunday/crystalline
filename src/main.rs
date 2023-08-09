@@ -33,7 +33,7 @@ async fn index(state: web::Data<Mutex<(CaptureReceiver, ProcessesReceiver, Conne
 
     let filtered_processes: ProcessInfos = processes.iter()
         .filter(|&(_, process)| !process.executable.is_empty())
-        .map(|(pid, process)| (pid.clone(), process.clone()))
+        .map(|(pid, process)| (*pid, process.clone()))
         .collect();
 
     HttpResponse::Ok().json(json!({"connections": connections, "processes": filtered_processes}))
