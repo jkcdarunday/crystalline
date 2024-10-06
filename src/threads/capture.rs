@@ -93,7 +93,7 @@ fn process_packet(packet: Packet, link_type: Linktype, addresses: &Vec<IpAddr>) 
 
 
     // Get source and destination IPs
-    if packet_data.ip.is_none() {
+    if packet_data.net.is_none() {
         return Err("Received non-ip packet".to_string());
     }
 
@@ -102,9 +102,9 @@ fn process_packet(packet: Packet, link_type: Linktype, addresses: &Vec<IpAddr>) 
         return Err("Received non-tcp/udp packet".to_string());
     }
 
-    let (source_ip, destination_ip) = match packet_data.ip.unwrap() {
-        Ipv4(header, _) => (IpAddr::V4(header.source_addr()), IpAddr::V4(header.destination_addr())),
-        Ipv6(header, _) => (IpAddr::V6(header.source_addr()), IpAddr::V6(header.destination_addr()))
+    let (source_ip, destination_ip) = match packet_data.net.unwrap() {
+        Ipv4(slice) => (IpAddr::V4(slice.header().source_addr()), IpAddr::V4(slice.header().destination_addr())),
+        Ipv6(slice) => (IpAddr::V6(slice.header().source_addr()), IpAddr::V6(slice.header().destination_addr()))
     };
 
     let connection = match packet_data.transport.unwrap() {
